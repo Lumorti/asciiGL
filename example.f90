@@ -16,7 +16,10 @@ program main
 
     do
 
-        ! Render the scene
+        ! Render the 3D scene
+        call render()
+
+        ! Draw the buffer to the screen
         call draw()
 
         ! Get the user's input (will process certain inputs if enabled)
