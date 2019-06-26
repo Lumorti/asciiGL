@@ -105,7 +105,7 @@ contains
         integer, dimension(2) :: project_coords
 
         project_coords(1) = xScale * (ez * pos(1) / pos(2)) + halfW
-        project_coords(2) = ez * pos(3) / pos(2) + halfH
+        project_coords(2) = -ez * pos(3) / pos(2) + halfH
 
     end function
 
@@ -219,12 +219,17 @@ contains
             end if
 
             ! Draw the line
-            call draw_line_3d(a, b)
+            call draw_line_3d(a, b, ".")
 
             z = z + deltaZ
 
         end do
 
+        call set_color("red")
+        call draw_string_3d(t%verts(highestZ,:), "highestZ = " // real_to_string(highestZVal), .true.)
+        call draw_string_3d(t%verts(middleZ,:), "highestZ = " // real_to_string(middleZVal), .true.)
+        call draw_string_3d(t%verts(lowestZ,:), "highestZ = " // real_to_string(lowestZVal), .true.)
+        call set_color("white")
 
     end subroutine
 
@@ -243,11 +248,11 @@ contains
                 case ("M") ! Right arrow
                     cameraDir(3) = cameraDir(3) - rotSpeed
                 case ("H") ! Up arrow
-                    cameraDir(1) = cameraDir(1) + cos(cameraDir(3))*rotSpeed
-                    cameraDir(2) = cameraDir(2) + sin(cameraDir(3))*rotSpeed
-                case ("P") ! Down arrow
                     cameraDir(1) = cameraDir(1) - cos(cameraDir(3))*rotSpeed
                     cameraDir(2) = cameraDir(2) - sin(cameraDir(3))*rotSpeed
+                case ("P") ! Down arrow
+                    cameraDir(1) = cameraDir(1) + cos(cameraDir(3))*rotSpeed
+                    cameraDir(2) = cameraDir(2) + sin(cameraDir(3))*rotSpeed
 
             end select
 
@@ -296,18 +301,85 @@ contains
 
     end subroutine
 
-    subroutine draw_string_3d(x, y, z, char)
+    subroutine draw_string_3d(v1, char, alwaysShow)
 
-        real, intent(in) :: x, y, z
+        real, dimension(3), intent(in) :: v1
+        logical, intent(in), optional :: alwaysShow
         character(*), intent(in) :: char
-        integer :: e, i
+        real, dimension(3) :: transformed1, transformed2
+        real, dimension(3) :: clipped1, clipped2
+        integer :: i, e
+        real :: angle2d, length3d, distance3d
+        real :: deltaLength = 0.1
+        real, dimension(3) :: pos, unitVector, v2
+        integer, dimension(2) :: startCoords, endCoords, coords
+        real :: da, db, s
+        real :: zBufferMod
 
-        integer, dimension(2) :: coords
+        v2 = v1 + (/ 1.0, 0.0, 0.0 /)
 
-        coords = project_coords(transform_coords((/ x, y, z /)))
+        transformed1 = transform_coords(v1)
+        transformed2 = transform_coords(v2)
+        clipped1 = transformed1
+        clipped2 = transformed2
 
-        do i = 1, len_trim(char)
-            e = mvaddch(coords(2), coords(1)+i-1, ichar(char(i:i)))
+        ! 3D Clip against near plane
+        if (transformed1(2) < nearDistance .and. transformed2(2) < nearDistance) then
+
+            return
+
+        else if (transformed1(2) < nearDistance) then
+
+            da = transformed1(2) - nearDistance
+            db = transformed2(2) - nearDistance
+            s = da / (da - db)
+
+            clipped1(1) = transformed1(1) + s*(transformed2(1)-transformed1(1))
+            clipped1(2) = transformed1(2) + s*(transformed2(2)-transformed1(2))
+            clipped1(3) = transformed1(3) + s*(transformed2(3)-transformed1(3))
+
+        else if (transformed2(2) < nearDistance) then
+
+            da = transformed1(2) - nearDistance
+            db = transformed2(2) - nearDistance
+            s = da / (da - db)
+
+            clipped2(1) = transformed2(1) + s*(transformed2(1)-transformed1(1))
+            clipped2(2) = transformed2(2) + s*(transformed2(2)-transformed1(2))
+            clipped2(3) = transformed2(3) + s*(transformed2(3)-transformed1(3))
+
+        end if
+
+        length3d = sqrt((clipped2(1)-clipped1(1))**2 + (clipped2(2)-clipped1(2))**2 + (clipped2(3)-clipped1(3))**2)
+        unitVector = (clipped2-clipped1) / norm2(clipped2-clipped1)
+
+        startCoords = project_coords(clipped1)
+        endCoords = project_coords(clipped2)
+
+        angle2d = atan2(real(endCoords(2)-startCoords(2)), real(endCoords(1)-startCoords(1)))
+
+        zBufferMod = 0
+        if (present(alwaysShow) .and. alwaysShow) zBufferMod = 10000
+
+        deltaLength = length3d / pointDensity
+        pos = clipped1
+
+        do i = 0, pointDensity
+
+            coords = project_coords(transform_coords(pos))
+            distance3d = sqrt((transformed1(1))**2 + (transformed1(2))**2 + (transformed1(3))**2)
+
+            ! 2D clipping
+            if (coords(1) >= 0 .and. coords(1) <= screenWidth .and. coords(2) >= 0 .and. coords(2) <= screenHeight) then
+
+                zBuffer(coords(1):coords(1)+len_trim(char), coords(2)) = distance3d - zBufferMod
+                call draw_string_2d(coords(1), coords(2), char)
+                return
+
+            end if
+
+            pos = pos + unitVector*deltaLength
+
         end do
 
     end subroutine
@@ -350,14 +422,16 @@ contains
 
     end subroutine
 
-    subroutine draw_line_3d(v1, v2)
+    subroutine draw_line_3d(v1, v2, c)
 
         real, dimension(3), intent(in) :: v1, v2
+        character(*), intent(in), optional :: c
         real, dimension(3) :: transformed1, transformed2
         real, dimension(3) :: clipped1, clipped2
         integer :: i, e
         real :: angle2d, length3d, distance3d
         character :: char
+        character(:), allocatable :: string
         real :: deltaLength = 0.1
         real, dimension(3) :: pos, unitVector
         integer, dimension(2) :: startCoords, endCoords, coords
@@ -403,7 +477,11 @@ contains
 
         angle2d = atan2(real(endCoords(2)-startCoords(2)), real(endCoords(1)-startCoords(1)))
 
-        char = charFromAngle(angle2d)
+        if (present(c)) then
+            char = c
+        else
+            char = charFromAngle(angle2d)
+        end if
 
         deltaLength = length3d / pointDensity
         pos = clipped1
