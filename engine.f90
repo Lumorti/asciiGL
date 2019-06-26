@@ -4,13 +4,20 @@ module engine
     use :: ncurses
     implicit none
 
+    real, parameter :: pi = 3.1415926536
+
+    ! System parameters
+    real :: moveSpeed = 0.02, rotSpeed = 0.02
     real, parameter :: ez = 60
     real, parameter :: xScale = 2.0
     real, parameter :: nearDistance = 0.5
-    integer, parameter :: pointDensityScale = 1, pointDensityLimit = 30
+    integer, parameter :: pointDensityScale = 1, pointDensityLimit = 35
     real, parameter :: lineOffset = 0.05
     integer, parameter :: maxObjects = 50
-    real :: moveSpeed = 0.02, rotSpeed = 0.02
+    integer, parameter :: maxInputs = 4
+
+    private :: ez, xScale, nearDistance, pointDensityLimit, pointDensityScale
+    private :: lineOffset, maxObjects, moveSpeed, rotSpeed, maxInputs
 
     type tri
         real, dimension(3, 3) :: verts
@@ -28,25 +35,51 @@ module engine
         module procedure vector_to_string, real_to_string, int_to_string
     end interface
 
-    real, parameter :: pi = 3.1415926536
-    real, dimension(3) :: cameraPos
-    real, dimension(3) :: cameraDir
-    logical :: wasdMoveEnabled = .false., arrowRotEnabled = .false.
+    ! Global vars
+    real, dimension(3) :: cameraPos, cameraDir, orbitPos = (/ 0.0, 2.0, 0.0 /)
+    logical :: wasdMoveEnabled = .false., arrowRotEnabled = .false., orbitEnabled = .false., flightEnabled = .false.
     type(renderObject), dimension(maxObjects) :: objs
-    integer :: numObjs = 0, transformations = 0
-    integer :: screenWidth = 0, screenHeight = 0
-    real :: halfW = 0, halfH = 0
+    integer :: numObjs = 0, transformations = 0,  screenWidth = 0, screenHeight = 0, frames
+    real :: halfW = 0, halfH = 0, fps, ms, orbitDistance = 3
     character :: lastChar = " "
     real, dimension(:, :), allocatable :: zBuffer
     character, dimension(:, :), allocatable :: buffer
 
+    private :: pi, cameraPos, cameraDir, orbitPos, wasdMoveEnabled, arrowRotEnabled
+    private :: objs, numObjs, transformations, screenWidth, screenHeight
+    private :: halfW, halfH, lastChar, zBuffer, buffer
+
+    private :: fill_tri, charFromAngle, get_length_needed, calc_medians
+
 contains
+
+    ! Function to sleep for a certain number of milliseconds
+    subroutine sleep_milli(milli)
+
+        integer, intent(in) :: milli
+        integer,dimension(8) :: t
+        integer :: s1, s2, ms1, ms2
+
+        ! Get start time
+        call date_and_time(values = t)
+        ms1 = (t(5)*3600 + t(6)*60 + t(7))*1000 + t(8)
+
+        ! Keep looping until the difference in milliseconds is the correct number
+        do
+
+            call date_and_time(values = t)
+            ms2 = (t(5)*3600 + t(6)*60 + t(7))*1000 + t(8)
+            if (ms2 - ms1 >= milli) exit
+
+        end do
+
+    end subroutine
 
     subroutine start()
 
         integer :: e
 
-        ! Set up the screen, hide the cursor, enable color, don't show the typed character
+        ! Set up the screen
         stdscr = initscr()
         e = curs_set(0)
         e = start_color()
@@ -73,12 +106,35 @@ contains
 
     end subroutine
 
-    subroutine enable_wasd_movement()
-        wasdMoveEnabled = .true.
+    subroutine enable_real_time()
+
+        logical*1 :: l
+        integer :: e
+        l = .true.
+
+        e = nodelay(stdscr, l)
+        call wtimeout(stdscr, 2)
+
     end subroutine
 
-    subroutine enable_arrows_rotation()
-        arrowRotEnabled = .true.
+    subroutine set_wasd_movement(val)
+        logical, intent(in) :: val
+        wasdMoveEnabled = val
+    end subroutine
+
+    subroutine set_arrows_rotation(val)
+        logical, intent(in) :: val
+        arrowRotEnabled = val
+    end subroutine
+
+    subroutine set_orbit(val)
+        logical, intent(in) :: val
+        orbitEnabled = val
+    end subroutine
+
+    subroutine set_flight(val)
+        logical, intent(in) :: val
+        flightEnabled = val
     end subroutine
 
     ! Rotate coordinates about the origin using camera rotation
@@ -91,15 +147,15 @@ contains
         transformations = transformations + 1
 
         xRot = reshape((/ 1.0,                    0.0,                    0.0,                &
-                        & 0.0,                    cos(-cameraDir(1)),      sin(-cameraDir(1)),  &
-                        & 0.0,                    -sin(-cameraDir(1)),     cos(-cameraDir(1))   /), shape(xRot))
+                        & 0.0,                    cos(cameraDir(1)),      -sin(cameraDir(1)),  &
+                        & 0.0,                    sin(cameraDir(1)),     cos(cameraDir(1))   /), shape(xRot))
 
-        yRot = reshape((/ cos(-cameraDir(2)),      0.0,                    -sin(-cameraDir(2)), &
+        yRot = reshape((/ cos(cameraDir(2)),      0.0,                    sin(cameraDir(2)), &
                         & 0.0,                    1.0,                    0.0,                &
-                        & sin(-cameraDir(2)),      0.0,                    cos(-cameraDir(2))   /), shape(yRot))
+                        & -sin(cameraDir(2)),      0.0,                    cos(cameraDir(2))   /), shape(yRot))
 
-        zRot = reshape((/ cos(-cameraDir(3)),     sin(-cameraDir(3)),     0.0,                &
-                        & -sin(-cameraDir(3)),    cos(-cameraDir(3)),     0.0,                &
+        zRot = reshape((/ cos(cameraDir(3)),     -sin(cameraDir(3)),     0.0,                &
+                        & sin(cameraDir(3)),    cos(cameraDir(3)),     0.0,                &
                         & 0.0,                    0.0,                    1.0                 /), shape(zRot))
 
         rotate_coords = matmul(xRot, matmul(zRot, matmul(yRot, pos)))
@@ -186,6 +242,7 @@ contains
         call draw_string_2d(4, 2, "tris drawn: " // str(trisDrawn))
         call draw_string_2d(23, 2, "transforms: " // str(transformations))
         call draw_string_2d(4, 3, "  last key: " // lastChar)
+        call draw_string_2d(23, 3, "fps: " // str(fps))
         call draw_string_2d(4, 4, "  rotation: " // str((180/pi)*cameraDir))
         call draw_string_2d(4, 5, "  position: " // str(cameraPos))
 
@@ -193,13 +250,27 @@ contains
 
     subroutine draw()
 
-        integer :: i, j, e
+        integer :: i, j, e, ms1
+        integer,dimension(8) :: t
 
         do i=1, screenWidth
             do j=1, screenHeight
                 e = mvaddch(j-1, i-1, ichar(buffer(i, j)))
             end do
         end do
+
+        frames = frames + 1
+
+        call date_and_time(values = t)
+        ms1 = (t(5)*3600 + t(6)*60 + t(7))*1000 + t(8)
+
+        if (ms1 - ms > 1000) then
+
+            fps = frames
+            ms = ms1
+            frames = 0
+
+        end if
 
     end subroutine
 
@@ -288,28 +359,50 @@ contains
 
     end subroutine
 
-    subroutine get_input(k)
+    subroutine process_input(k)
 
-        character, intent(inout) :: k
-        k = char(getch())
-        lastChar = k
+        character, intent(in) :: k
 
         if (arrowRotEnabled) then
 
-            select case (k)
+            if (.not. orbitEnabled) then
 
-                case ("K") ! Left arrow
-                    cameraDir(3) = cameraDir(3) + rotSpeed
-                case ("M") ! Right arrow
-                    cameraDir(3) = cameraDir(3) - rotSpeed
-                case ("H") ! Up arrow
-                    cameraDir(1) = cameraDir(1) + rotSpeed!*cos(cameraDir(3))
-                    !cameraDir(2) = cameraDir(2) + sin(cameraDir(3))*rotSpeed
-                case ("P") ! Down arrow
-                    cameraDir(1) = cameraDir(1) - rotSpeed!*cos(cameraDir(3))
-                    !cameraDir(2) = cameraDir(2) - sin(cameraDir(3))*rotSpeed
+                select case (k)
 
-            end select
+                    case ("K") ! Left arrow
+                        cameraDir(3) = cameraDir(3) + rotSpeed
+                    case ("M") ! Right arrow
+                        cameraDir(3) = cameraDir(3) - rotSpeed
+                    case ("H") ! Up arrow
+                        cameraDir(1) = cameraDir(1) + rotSpeed
+                    case ("P") ! Down arrow
+                        cameraDir(1) = cameraDir(1) - rotSpeed
+
+                end select
+
+            else
+
+                select case (k)
+
+                    case ("K") ! Left arrow
+                        cameraDir(3) = cameraDir(3) - rotSpeed
+                        call update_orbit()
+
+                    case ("M") ! Right arrow
+                        cameraDir(3) = cameraDir(3) + rotSpeed
+                        call update_orbit()
+
+                    case ("H") ! Up arrow
+                        cameraDir(1) = cameraDir(1) - rotSpeed
+                        call update_orbit()
+
+                    case ("P") ! Down arrow
+                        cameraDir(1) = cameraDir(1) + rotSpeed
+                        call update_orbit()
+
+                end select
+
+            end if
 
         end if
 
@@ -333,6 +426,47 @@ contains
             end select
 
         end if
+
+        if (flightEnabled) then
+
+            select case (k)
+
+                case (" ")
+                    cameraPos(3) = cameraPos(3) + moveSpeed
+                case ("c")
+                    cameraPos(3) = cameraPos(3) - moveSpeed
+
+            end select
+
+        end if
+
+    end subroutine
+
+    subroutine update_orbit()
+
+        real, dimension(3) :: unit
+
+        unit = (/ -sin(cameraDir(3))*cos(cameraDir(1)), cos(cameraDir(3))*cos(cameraDir(1)), sin(cameraDir(1)) /)
+        cameraPos = orbitPos - orbitDistance*unit/norm2(unit)
+
+    end subroutine
+
+    subroutine get_input(k)
+
+        character, dimension(maxInputs) :: c
+        character, intent(inout) :: k
+        integer :: i
+
+        do i=1, maxInputs
+            c(i) = char(getch())
+        end do
+
+        do i=1, maxInputs
+            call process_input(c(i))
+        end do
+
+        if (c(1) /= "ÿ") lastChar = c(1)
+        k = c(1)
 
     end subroutine
 
@@ -430,6 +564,7 @@ contains
 
     end subroutine
 
+    ! TODO get working against, need color matrix
     subroutine set_color(col)
 
         character(*), intent(in) :: col
