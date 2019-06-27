@@ -1,4 +1,4 @@
-files=engine.f90 example.f90
+files=asciiGL.f90 example.f90
 
 rmcommand=rm
 ifeq ($(OS),Windows_NT)

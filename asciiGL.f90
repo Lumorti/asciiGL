@@ -1,5 +1,5 @@
 ! hello.f90
-module engine
+module asciiGL
 
     use :: ncurses
     implicit none
@@ -28,6 +28,8 @@ module engine
         integer :: numTris = 0
         type(tri), allocatable, dimension(:) :: tris
         real, dimension(3) :: centre = (/ 0, 0, 0 /), rot = (/ 0, 0, 0 /)
+        character :: fillChar = ".", edgeChar = "/"
+        integer :: fillCol = 0, edgeCol = 0
     end type
 
     interface str
@@ -37,6 +39,7 @@ module engine
     ! Global vars
     real, dimension(3) :: cameraPos, cameraDir, orbitPos = (/ 0.0, 0.0, 0.0 /)
     logical :: wasdMoveEnabled = .false., arrowRotEnabled = .false., orbitEnabled = .false., flightEnabled = .false.
+    logical :: debugEnabled = .false.
     type(renderObject), dimension(maxObjects) :: objs
     integer :: numObjs = 0, transformations = 0,  screenWidth = 0, screenHeight = 0, frames
     real :: halfW = 0, halfH = 0, fps, ms, orbitDistance = 3
@@ -56,12 +59,18 @@ contains
     subroutine start()
 
         integer :: e
+        logical*1 :: l
 
         ! Set up the screen
         stdscr = initscr()
         e = curs_set(0)
         e = start_color()
         e = noecho()
+
+        ! Make it non-blocking
+        l = .true.
+        e = nodelay(stdscr, l)
+        call wtimeout(stdscr, 2)
 
         ! Get the initial screen size
         call getmaxyx(stdscr, screenHeight, screenWidth)
@@ -78,67 +87,149 @@ contains
         allocate(zBuffer(0:screenWidth, 0:screenHeight))
         zBuffer = 300000.0
 
+        e = attron(A_BOLD)
+
         ! Set up some color pairs
-        e = init_pair(1_c_short, COLOR_WHITE, COLOR_BLACK)
-        e = init_pair(2_c_short, COLOR_RED, COLOR_BLACK)
-        e = init_pair(3_c_short, COLOR_GREEN, COLOR_BLACK)
-        e = init_pair(4_c_short, COLOR_BLUE, COLOR_BLACK)
+        e = init_pair(1 _c_short, COLOR_RED, COLOR_BLACK)
+        e = init_pair(2 _c_short, COLOR_GREEN, COLOR_BLACK)
+        e = init_pair(3 _c_short, COLOR_BLUE, COLOR_BLACK)
+        e = init_pair(4 _c_short, COLOR_MAGENTA, COLOR_BLACK)
+        e = init_pair(5 _c_short, COLOR_YELLOW, COLOR_BLACK)
+        e = init_pair(6 _c_short, COLOR_CYAN, COLOR_BLACK)
 
     end subroutine
 
-    subroutine enable_real_time()
+    subroutine set_interactivity(val)
 
-        logical*1 :: l
-        integer :: e
-        l = .true.
+        character(*), intent(in) :: val
 
-        e = nodelay(stdscr, l)
-        call wtimeout(stdscr, 2)
+        select case (val)
+            case ("none")
+                wasdMoveEnabled = .false.
+                arrowRotEnabled = .false.
+                flightEnabled = .false.
+                orbitEnabled = .false.
+            case ("walk")
+                wasdMoveEnabled = .true.
+                arrowRotEnabled = .true.
+                flightEnabled = .false.
+                orbitEnabled = .false.
+            case ("fly")
+                wasdMoveEnabled = .true.
+                arrowRotEnabled = .true.
+                flightEnabled = .true.
+                orbitEnabled = .false.
+            case ("orbit")
+                wasdMoveEnabled = .true.
+                arrowRotEnabled = .true.
+                flightEnabled = .false.
+                orbitEnabled = .true.
+            case default
+                wasdMoveEnabled = .false.
+                arrowRotEnabled = .false.
+                flightEnabled = .false.
+                orbitEnabled = .false.
+        end select
 
     end subroutine
 
-    subroutine set_interactive(val)
+    subroutine set_debug(val)
         logical, intent(in) :: val
-        wasdMoveEnabled = val
-        arrowRotEnabled = val
+        debugEnabled = val
     end subroutine
 
-    subroutine set_orbit_enabled(val)
-        logical, intent(in) :: val
-        orbitEnabled = val
-        if (val) orbitDistance = norm2(cameraPos - orbitPos)
+    function get_camera_pos()
+        real, dimension(3) :: get_camera_pos
+        get_camera_pos = cameraPos
+    end function
+    subroutine set_camera_pos(p)
+        real, dimension(3), intent(in) :: p
+        cameraPos = p
     end subroutine
 
-    subroutine set_flight_enabled(val)
-        logical, intent(in) :: val
-        flightEnabled = val
+    function get_camera_rot()
+        real, dimension(3) :: get_camera_rot
+        get_camera_rot = cameraDir
+    end function
+    subroutine set_camera_rot(p)
+        real, dimension(3), intent(in) :: p
+        cameraDir = p
+        if (orbitEnabled) call update_orbit()
+    end subroutine
+
+    function get_object_pos(index)
+        integer, intent(in) :: index
+        real, dimension(3) :: get_object_pos
+        get_object_pos = objs(index)%centre
+    end function
+    subroutine set_object_pos(index, p)
+        real, dimension(3), intent(in) :: p
+        integer, intent(in) :: index
+        real, dimension(3) :: delta
+        delta = p - objs(index)%centre
+        call translate_object_dir(objs(index), delta)
+    end subroutine
+    subroutine translate_object(index, p)
+        real, dimension(3), intent(in) :: p
+        integer, intent(in) :: index
+        call translate_object_dir(objs(index), p)
+    end subroutine
+
+    function get_object_rot(index)
+        real, dimension(3) :: get_object_rot
+        integer, intent(in) :: index
+        get_object_rot = objs(index)%rot
+    end function
+    subroutine set_object_rot(index, p)
+        real, dimension(3), intent(in) :: p
+        integer, intent(in) :: index
+        real, dimension(3) :: delta
+        delta = p - objs(index)%rot
+        call rotate_object_dir(objs(index), delta)
+    end subroutine
+    subroutine rotate_object(index, p)
+        real, dimension(3), intent(in) :: p
+        integer, intent(in) :: index
+        call rotate_object_dir(objs(index), p)
     end subroutine
 
     subroutine set_orbit_object(objIndex)
         integer, intent(in) :: objIndex
         orbitPos = objs(objIndex)%centre
-        orbitDistance = norm2(cameraPos - orbitPos)
+        call update_orbit()
+    end subroutine
+
+    subroutine set_orbit_pivot(p)
+        real, dimension(3), intent(in) :: p
+        orbitPos = p
+        call update_orbit()
+    end subroutine
+
+    subroutine set_orbit_distance(p)
+        real, intent(in) :: p
+        orbitDistance = p
+        call update_orbit()
     end subroutine
 
     ! Rotate coordinates about the origin using camera rotation
-    function rotate_coords(pos)
+    function rotate_coords(pos, v)
 
-        real, dimension(3), intent(in) :: pos
+        real, dimension(3), intent(in) :: pos, v
         real, dimension(3) :: rotate_coords
         real, dimension(3,3) :: xRot, yRot, zRot
 
         transformations = transformations + 1
 
         xRot = reshape((/ 1.0,                    0.0,                    0.0,                &
-                        & 0.0,                    cos(cameraDir(1)),      -sin(cameraDir(1)),  &
-                        & 0.0,                    sin(cameraDir(1)),     cos(cameraDir(1))   /), shape(xRot))
+                        & 0.0,                    cos(v(1)),      -sin(v(1)),  &
+                        & 0.0,                    sin(v(1)),     cos(v(1))   /), shape(xRot))
 
-        yRot = reshape((/ cos(cameraDir(2)),      0.0,                    sin(cameraDir(2)), &
+        yRot = reshape((/ cos(v(2)),      0.0,                    sin(v(2)), &
                         & 0.0,                    1.0,                    0.0,                &
-                        & -sin(cameraDir(2)),      0.0,                    cos(cameraDir(2))   /), shape(yRot))
+                        & -sin(cameraDir(2)),      0.0,                    cos(v(2))   /), shape(yRot))
 
-        zRot = reshape((/ cos(cameraDir(3)),     -sin(cameraDir(3)),     0.0,                &
-                        & sin(cameraDir(3)),    cos(cameraDir(3)),     0.0,                &
+        zRot = reshape((/ cos(v(3)),     -sin(v(3)),     0.0,                &
+                        & sin(v(3)),    cos(v(3)),     0.0,                &
                         & 0.0,                    0.0,                    1.0                 /), shape(zRot))
 
         rotate_coords = matmul(xRot, matmul(zRot, matmul(yRot, pos)))
@@ -159,7 +250,7 @@ contains
         p(3) = pos(3) - cameraPos(3)
 
         ! Rotate about the origin
-        transform_coords = rotate_coords(p)
+        transform_coords = rotate_coords(p, cameraDir)
 
     end function
 
@@ -178,7 +269,7 @@ contains
     subroutine render()
 
         integer :: i, j
-        real, dimension(3) :: trans, toCam
+        real, dimension(3) :: trans, toCam, a, b
         real :: angle
 
         integer :: trisDrawn
@@ -197,7 +288,7 @@ contains
             do j=1, objs(i)%numTris
 
                 ! Only draw if the normal is facing away from the player
-                trans = rotate_coords(objs(i)%tris(j)%norm)
+                trans = rotate_coords(objs(i)%tris(j)%norm, cameraDir)
                 toCam = transform_coords(objs(i)%tris(j)%median)
                 angle = acos(DOT_PRODUCT(trans, toCam / norm2(toCam)))
 
@@ -206,12 +297,18 @@ contains
                     trisDrawn = trisDrawn + 1
 
                     ! Fill triangle using zBuffer
-                    call fill_tri(objs(i)%tris(j), ".")
+                    call fill_tri(objs(i)%tris(j), objs(i)%fillChar, objs(i)%fillCol)
 
-                    ! Add the edges using the zBuffer
-                    call draw_line_3d(objs(i)%tris(j)%verts(1,:), objs(i)%tris(j)%verts(2,:), dz=lineOffset)
-                    call draw_line_3d(objs(i)%tris(j)%verts(2,:), objs(i)%tris(j)%verts(3,:), dz=lineOffset)
-                    call draw_line_3d(objs(i)%tris(j)%verts(3,:), objs(i)%tris(j)%verts(1,:), dz=lineOffset)
+                    ! Add the edges using the zBuffer (a and b prevent array temporaries)
+                    a = objs(i)%tris(j)%verts(1,:)
+                    b = objs(i)%tris(j)%verts(2,:)
+                    call draw_line_3d(a, b, objs(i)%edgeChar, objs(i)%edgeCol, dz=lineOffset)
+                    a = objs(i)%tris(j)%verts(2,:)
+                    b = objs(i)%tris(j)%verts(3,:)
+                    call draw_line_3d(a, b, objs(i)%edgeChar, objs(i)%edgeCol, dz=lineOffset)
+                    a = objs(i)%tris(j)%verts(3,:)
+                    b = objs(i)%tris(j)%verts(1,:)
+                    call draw_line_3d(a, b, objs(i)%edgeChar, objs(i)%edgeCol, dz=lineOffset)
 
                 end if
 
@@ -219,20 +316,20 @@ contains
 
         end do
 
-        ! Draw ui stuff
-        call draw_box(2, 1, 46, 6)
-        call draw_string_2d(4, 2, "tris drawn: " // str(trisDrawn))
-        call draw_string_2d(23, 2, "transforms: " // str(transformations))
-        call draw_string_2d(4, 3, "  last key: " // lastChar)
-        call draw_string_2d(23, 3, "fps: " // str(fps))
-        call draw_string_2d(4, 4, "  rotation: " // str((180/pi)*cameraDir))
-        call draw_string_2d(4, 5, "  position: " // str(cameraPos))
+        ! Draw debug ui stuff
+        if (debugEnabled) then
 
-        call draw_string_2d(5,30,str(objs(2)%tris(1)%norm(:)))
-        call draw_string_2d(5,31,str(objs(2)%tris(1)%verts(1,:)))
-        call draw_string_2d(5,32,str(objs(2)%tris(1)%verts(2,:)))
-        call draw_string_2d(5,33,str(objs(2)%tris(1)%verts(3,:)))
 
+            call fill_box_2d(2, 1, 47, 6, " ")
+            call draw_box_2d(2, 1, 47, 6)
+            call draw_string_2d(4, 2, "  tris drawn: " // str(trisDrawn))
+            call draw_string_2d(23, 2, "transforms: " // str(transformations))
+            call draw_string_2d(4, 3, "  last key: " // lastChar)
+            call draw_string_2d(23, 3, "fps: " // str(fps))
+            call draw_string_2d(4, 4, "  rotation: " // str(cameraDir))
+            call draw_string_2d(4, 5, "  position: " // str(cameraPos))
+
+        end if
 
     end subroutine
 
@@ -243,8 +340,9 @@ contains
 
         do i=1, screenWidth
             do j=1, screenHeight
-                e = attron(COLOR_PAIR(colBuffer(i, j)))
+                e = attron(COLOR_PAIR(colBuffer(i, j)))                           ! Enable attribute.
                 e = mvaddch(j-1, i-1, ichar(buffer(i, j)))
+                e = attroff(COLOR_PAIR(colBuffer(i, j)))                           ! Enable attribute.
             end do
         end do
 
@@ -260,7 +358,7 @@ contains
 
     end subroutine
 
-    subroutine draw_box(x1, y1, x2, y2)
+    subroutine draw_box_2d(x1, y1, x2, y2)
 
         integer, intent(in) :: x1, y1, x2, y2
 
@@ -271,24 +369,37 @@ contains
 
     end subroutine
 
-    ! Fill triangle using zBuffer TODO make work for flat surfaces
-    subroutine fill_tri(tIn, char)
+    subroutine fill_box_2d(x1, y1, x2, y2, char)
+
+        integer, intent(in) :: x1, y1, x2, y2
+        character, intent(in) :: char
+        integer :: i
+
+        do i = y1, y2
+            call draw_line_2d(x1, i, x2, i, char)
+        end do
+
+    end subroutine
+
+    ! Fill triangle using zBuffer
+    subroutine fill_tri(tIn, char, col)
 
         type(tri), intent(in) :: tIn
         type(tri) :: t
         character, intent(in) :: char
+        integer, intent(in) :: col
 
         integer :: i, pointDensity
         real :: highestZVal, lowestZVal, middleZVal, deltaZ, z, dh, dl, s
         integer :: highestZ, lowestZ, middleZ
-        real, dimension(3) :: a, b, t1, t2
+        real, dimension(3) :: a, b, t1, t2, highV, lowV
 
         t = tIn
 
         highestZ = maxloc((/ t%verts(1,3), t%verts(2,3), t%verts(3,3) /), 1)
         lowestZ = minloc((/ t%verts(1,3), t%verts(2,3), t%verts(3,3) /), 1)
 
-        ! TODO Make work for flat surfaces
+        ! Make work for flat surfaces
         if (highestZ == lowestZ) then
 
             highestZ = 1
@@ -307,8 +418,12 @@ contains
         middleZVal = t%verts(middleZ, 3)
         lowestZVal = t%verts(lowestZ, 3)
 
-        t1 = transform_coords(t%verts(highestZ, :))
-        t2 = transform_coords(t%verts(lowestZ, :))
+        ! Used to prevent "an array temporary was created"
+        lowV = t%verts(lowestZ, :)
+        highV = t%verts(highestZ, :)
+
+        t1 = transform_coords(highV)
+        t2 = transform_coords(lowV)
         pointDensity = ceiling(pointDensityScale * norm2(real(project_coords(t1) - project_coords(t2))))
         if (pointDensity > pointDensityLimit) pointDensity = pointDensityLimit
 
@@ -322,6 +437,7 @@ contains
             dh = t%verts(highestZ, 3) - z
             dl = t%verts(lowestZ, 3) - z
             s = -dh / (dh - dl)
+            if (abs(s) > 1) cycle
             a(1) = t%verts(highestZ, 1) + s*(t%verts(highestZ, 1) - t%verts(lowestZ, 1))
             a(2) = t%verts(highestZ, 2) + s*(t%verts(highestZ, 2) - t%verts(lowestZ, 2))
             a(3) = z
@@ -333,6 +449,7 @@ contains
                 dh = t%verts(highestZ, 3) - z
                 dl = t%verts(middleZ, 3) - z
                 s = -dh / (dh - dl)
+                if (abs(s) > 1) cycle
                 b(1) = t%verts(highestZ, 1) + s*(t%verts(highestZ, 1) - t%verts(middleZ, 1))
                 b(2) = t%verts(highestZ, 2) + s*(t%verts(highestZ, 2) - t%verts(middleZ, 2))
                 b(3) = z
@@ -343,6 +460,7 @@ contains
                 dh = t%verts(middleZ, 3) - z
                 dl = t%verts(lowestZ, 3) - z
                 s = -dh / (dh - dl)
+                if (abs(s) > 1) cycle
                 b(1) = t%verts(middleZ, 1) + s*(t%verts(middleZ, 1) - t%verts(lowestZ, 1))
                 b(2) = t%verts(middleZ, 2) + s*(t%verts(middleZ, 2) - t%verts(lowestZ, 2))
                 b(3) = z
@@ -350,7 +468,7 @@ contains
             end if
 
             ! Draw the line
-            call draw_line_3d(a, b, char)
+            call draw_line_3d(a, b, char, col)
 
             z = z - deltaZ
 
@@ -391,6 +509,19 @@ contains
 
                 end select
 
+                if (flightEnabled) then
+
+                    select case (k)
+
+                        case (" ")
+                            cameraPos(3) = cameraPos(3) + moveSpeed
+                        case ("c")
+                            cameraPos(3) = cameraPos(3) - moveSpeed
+
+                    end select
+
+                end if
+
             else
 
                 select case (k)
@@ -422,29 +553,6 @@ contains
                 end select
 
             end if
-
-        end if
-
-        if (wasdMoveEnabled) then
-
-            select case (k)
-
-
-
-            end select
-
-        end if
-
-        if (flightEnabled) then
-
-            select case (k)
-
-                case (" ")
-                    cameraPos(3) = cameraPos(3) + moveSpeed
-                case ("c")
-                    cameraPos(3) = cameraPos(3) - moveSpeed
-
-            end select
 
         end if
 
@@ -576,14 +684,23 @@ contains
                 get_color_number = 2
             case ("blue")
                 get_color_number = 3
+            case ("magenta")
+                get_color_number = 4
+            case ("yellow")
+                get_color_number = 5
+            case ("cyan")
+                get_color_number = 6
+            case default
+                get_color_number = 0
 
         end select
 
     end function
 
-    subroutine draw_line_2d(x1, y1, x2, y2)
+    subroutine draw_line_2d(x1, y1, x2, y2, c)
 
         integer, intent(in) :: x1, y1, x2, y2
+        character, intent(in), optional :: c
         integer :: length, i
         real :: angle
         character :: char
@@ -591,7 +708,11 @@ contains
         angle = atan2(real(y2-y1), real(x2-x1))
         length = nint(sqrt(real((y2-y1)**2 + (x2-x1)**2)))
 
-        char = charFromAngle(angle)
+        if (present(c)) then
+            char = c
+        else
+            char = charFromAngle(angle)
+        end if
 
         do i = 0, length
             buffer(nint(x1+i*cos(angle)), nint(y1+i*sin(angle))) = char
@@ -599,11 +720,12 @@ contains
 
     end subroutine
 
-    subroutine draw_line_3d(v1, v2, c, dz)
+    subroutine draw_line_3d(v1, v2, c, col, dz)
 
         real, dimension(3), intent(in) :: v1, v2
-        character(*), intent(in), optional :: c
+        character(*), intent(in) :: c
         real, intent(in), optional :: dz
+        integer, intent(in) :: col
         real :: zBufferMod
         real, dimension(3) :: transformed1, transformed2
         real, dimension(3) :: clipped1, clipped2
@@ -664,7 +786,7 @@ contains
 
         angle2d = atan2(real(endCoords(2)-startCoords(2)), real(endCoords(1)-startCoords(1)))
 
-        if (present(c)) then
+        if (c /= "/") then
             char = c
         else
             char = charFromAngle(angle2d)
@@ -686,6 +808,7 @@ contains
 
                     zBuffer(coords(1), coords(2)) = distance3d
                     buffer(coords(1), coords(2)) = char
+                    colBuffer(coords(1), coords(2)) = col
 
                 end if
 
@@ -797,7 +920,9 @@ contains
         type(renderObject), intent(inout) :: obj
 
         integer :: i, j
-        real, dimension(3) :: avg
+        real, dimension(3) :: avg, objAvg
+
+        objAvg = 0
 
         ! For each primitive triangle
         do i=1, obj%numTris
@@ -812,28 +937,45 @@ contains
             ! Divide by 3 to get the average
             obj%tris(i)%median = avg / 3.0
 
+            ! Sum all of the triangle medians
+            objAvg = objAvg + obj%tris(i)%median
+
         end do
+
+        ! Calculate the mean point for the object
+        obj%centre = objAvg / obj%numTris
 
     end subroutine
 
     ! Create a cube at a certain position with a certain size
-    subroutine add_cube(p, s)
+    subroutine add_cube(pos, s, index, edgeCol, edgeChar, fillCol, fillChar)
 
-        real, dimension(3), intent(in) :: p, s
+        real, dimension(3), intent(in) :: pos, s
+        integer, intent(inout), optional :: index
         real :: w, d, h, x, y, z
+        character(*), intent(in), optional :: edgeChar, fillChar, fillCol, edgeCol
 
         ! Shorthand
         w = s(1) / 2.0
         d = s(2) / 2.0
         h = s(3) / 2.0
-
-        x = p(1)
-        y = p(2)
-        z = p(3)
+        x = pos(1)
+        y = pos(2)
+        z = pos(3)
 
         numObjs = numObjs + 1
+
+        if (present(index)) then
+            index  = numObjs
+        end if
+
+        if (present(edgeCol)) objs(numObjs)%edgeCol = get_color_number(edgeCol)
+        if (present(edgeChar)) objs(numObjs)%edgeChar = edgeChar
+        if (present(fillCol)) objs(numObjs)%fillCol = get_color_number(fillCol)
+        if (present(fillChar)) objs(numObjs)%fillChar = fillChar
+
         objs(numObjs)%numTris = 12
-        objs(numObjs)%centre = p
+        objs(numObjs)%centre = pos
         allocate(objs(numObjs)%tris(objs(numObjs)%numTris))
 
         ! Closest face
@@ -901,10 +1043,12 @@ contains
     end subroutine
 
     ! Load a model from an STL file at a certain position
-    subroutine add_stl(filename, p)
+    subroutine add_stl(filename, pos, index, edgeCol, edgeChar, fillCol, fillChar)
 
-        real, dimension(3), intent(in) :: p
+        real, dimension(3), intent(in) :: pos
         character(*), intent(in) :: filename
+        character(*), intent(in), optional :: edgeChar, fillChar, fillCol, edgeCol
+        integer, intent(inout), optional :: index
         integer*1, dimension(80) :: header
         integer*4 :: num
         integer*2 :: count
@@ -912,6 +1056,15 @@ contains
         real*4, dimension(3) :: vector
 
         numObjs = numObjs + 1
+
+        if (present(index)) then
+            index  = numObjs
+        end if
+
+        if (present(edgeCol)) objs(numObjs)%edgeCol = get_color_number(edgeCol)
+        if (present(edgeChar)) objs(numObjs)%edgeChar = edgeChar
+        if (present(fillCol)) objs(numObjs)%fillCol = get_color_number(fillCol)
+        if (present(fillChar)) objs(numObjs)%fillChar = fillChar
 
         ! Load the file
         open (15, file = filename, form='unformatted', access='stream')
@@ -943,12 +1096,13 @@ contains
 
         close(15)
 
-        call translate_object(objs(numObjs), p)
+        call translate_object_dir(objs(numObjs), pos)
         call calc_medians(objs(numObjs))
 
     end subroutine
 
-    subroutine translate_object(obj, v)
+    ! Translate an object by a vector
+    subroutine translate_object_dir(obj, v)
 
         type(renderObject), intent(inout) :: obj
         real, dimension(3), intent(in) :: v
@@ -959,10 +1113,37 @@ contains
             do j=1, 3
                 obj%tris(i)%verts(j,:) = obj%tris(i)%verts(j,:) + v
             end do
+            obj%tris(i)%median(:) = obj%tris(i)%median(:) + v
         end do
 
         obj%centre = obj%centre + v
 
     end subroutine
 
-end module engine
+    ! Rotate an object by a vector
+    subroutine rotate_object_dir(obj, v)
+
+        type(renderObject), intent(inout) :: obj
+        real, dimension(3), intent(in) :: v
+
+        integer :: i, j
+
+        do i=1, obj%numTris
+
+            do j=1, 3
+
+                ! Take away the objects central position, rotate (about the origin) and then add it back
+                obj%tris(i)%verts(j,:) = rotate_coords(obj%tris(i)%verts(j,:) - obj%centre, v) + obj%centre
+
+            end do
+
+            ! Rotate the normals
+            obj%tris(i)%norm(:) = rotate_coords(obj%tris(i)%norm(:), v)
+
+        end do
+
+        obj%rot = obj%rot + v
+
+    end subroutine
+
+end module
