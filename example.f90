@@ -9,13 +9,14 @@ program main
 
     ! Enable controls
     call enable_real_time()
-    call set_wasd_movement(.false.)
-    call set_arrows_rotation(.true.)
-    call set_flight(.false.)
-    call set_orbit(.true.)
+    call set_interactive(.true.)
+    call set_flight_enabled(.true.)
+    call set_orbit_enabled(.true.)
 
     ! Add test objects
-    call add_cube(0.0, 2.0, 0.0, 1.0, 1.0, 1.0)
+    call add_cube((/ 2.0, 4.0, 0.0 /), (/ 1.0, 1.0, 1.0 /))
+    call add_stl("cube.stl", (/ 0.0, 4.0, 0.0 /))
+    call set_orbit_object(2)
 
     do
 
