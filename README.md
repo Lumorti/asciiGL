@@ -77,27 +77,4 @@ end program
 
 ### Documentation
 
-```Fortran
-call set_interactivity(type)
-```
-```Fortran
-character(*), intent(in) :: type
- ```
-This sets the kind of control the user should have over the camera, here __type__ is one of:
- - "none" (user cannot move the camera)
- - "walk" (wasd to move, arrow keys to turn)
- - "fly" (same as walk but can use space/c to go up/down)
- - "orbit" (camera orbits a point, arrow keys to turn, w/s to zoom)
-
-<br>
-
-```Fortran
-call add_stl(filename, pos, index, edgeCol, edgeChar, fillCol, fillChar)
-```
-```Fortran
-real, dimension(3), intent(in) :: pos
-character(*), intent(in) :: filename
-character(*), intent(in), optional :: edgeChar, fillChar, fillCol, edgeCol
-integer, intent(inout), optional :: index
- ```
-This loads an stl file and creates an object using it, starting at position __pos__ and storing the ID of the newly generated object in __index__. The __edgeChar__ and __fillChar__ are the characters used to fill the respective sections, whilst __edgeCol__ and __fillCol__ are the colors ("white", "red", "green", "blue", "magenta", "yellow", "cyan") for those sections.
+Full function documentation available [here](docs.md)

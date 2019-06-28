@@ -142,18 +142,18 @@ contains
         real, dimension(3) :: get_camera_pos
         get_camera_pos = cameraPos
     end function
-    subroutine set_camera_pos(p)
-        real, dimension(3), intent(in) :: p
-        cameraPos = p
+    subroutine set_camera_pos(newPos)
+        real, dimension(3), intent(in) :: newPos
+        cameraPos = newPos
     end subroutine
 
     function get_camera_rot()
         real, dimension(3) :: get_camera_rot
         get_camera_rot = cameraDir
     end function
-    subroutine set_camera_rot(p)
-        real, dimension(3), intent(in) :: p
-        cameraDir = p
+    subroutine set_camera_rot(newRot)
+        real, dimension(3), intent(in) :: newRot
+        cameraDir = newRot
         if (orbitEnabled) call update_orbit()
     end subroutine
 
@@ -162,17 +162,17 @@ contains
         real, dimension(3) :: get_object_pos
         get_object_pos = objs(index)%centre
     end function
-    subroutine set_object_pos(index, p)
-        real, dimension(3), intent(in) :: p
+    subroutine set_object_pos(index, newPos)
+        real, dimension(3), intent(in) :: newPos
         integer, intent(in) :: index
         real, dimension(3) :: delta
-        delta = p - objs(index)%centre
+        delta = newPos - objs(index)%centre
         call translate_object_dir(objs(index), delta)
     end subroutine
-    subroutine translate_object(index, p)
-        real, dimension(3), intent(in) :: p
+    subroutine translate_object(index, deltaPos)
+        real, dimension(3), intent(in) :: deltaPos
         integer, intent(in) :: index
-        call translate_object_dir(objs(index), p)
+        call translate_object_dir(objs(index), deltaPos)
     end subroutine
 
     function get_object_rot(index)
@@ -180,17 +180,17 @@ contains
         integer, intent(in) :: index
         get_object_rot = objs(index)%rot
     end function
-    subroutine set_object_rot(index, p)
-        real, dimension(3), intent(in) :: p
+    subroutine set_object_rot(index, newRot)
+        real, dimension(3), intent(in) :: newRot
         integer, intent(in) :: index
         real, dimension(3) :: delta
-        delta = p - objs(index)%rot
+        delta = newRot - objs(index)%rot
         call rotate_object_dir(objs(index), delta)
     end subroutine
-    subroutine rotate_object(index, p)
-        real, dimension(3), intent(in) :: p
+    subroutine rotate_object(index, deltaRot)
+        real, dimension(3), intent(in) :: deltaRot
         integer, intent(in) :: index
-        call rotate_object_dir(objs(index), p)
+        call rotate_object_dir(objs(index), deltaRot)
     end subroutine
 
     subroutine set_orbit_object(objIndex)
@@ -199,15 +199,15 @@ contains
         call update_orbit()
     end subroutine
 
-    subroutine set_orbit_pivot(p)
-        real, dimension(3), intent(in) :: p
-        orbitPos = p
+    subroutine set_orbit_pivot(piv)
+        real, dimension(3), intent(in) :: piv
+        orbitPos = piv
         call update_orbit()
     end subroutine
 
-    subroutine set_orbit_distance(p)
-        real, intent(in) :: p
-        orbitDistance = p
+    subroutine set_orbit_distance(dist)
+        real, intent(in) :: dist
+        orbitDistance = dist
         call update_orbit()
     end subroutine
 
@@ -709,7 +709,11 @@ contains
         length = nint(sqrt(real((y2-y1)**2 + (x2-x1)**2)))
 
         if (present(c)) then
-            char = c
+            if (c /= "/") then
+                char = c
+            else
+                char = charFromAngle(angle)
+            end if
         else
             char = charFromAngle(angle)
         end if
