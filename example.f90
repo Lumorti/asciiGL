@@ -13,6 +13,7 @@ program example
 
     ! Add a chair model, saving the ID into chairObject
     call add_stl("chair.stl", (/ 0.0, 6.0, 0.0 /), chairObject, edgeCol="red")
+    call set_object_scale(chairObject, (/ 2.0, 1.0, 1.0 /))
 
     ! Orbit around the chair, setting the initial distance and angle
     call set_orbit_object(chairObject)

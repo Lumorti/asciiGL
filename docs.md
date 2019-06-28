@@ -1,7 +1,7 @@
 
 ### Documentation
 
-###### set_interactivity
+#### set_interactivity
 ```Fortran
 call set_interactivity(type)
 ```
@@ -16,7 +16,7 @@ This sets the kind of control the user should have over the camera, here __type_
 
 <br>
 
-###### add_stl
+#### add_stl
 ```Fortran
 call add_stl(filename, pos, index, edgeCol, edgeChar, fillCol, fillChar)
 ```
@@ -30,7 +30,7 @@ This loads an stl file and creates an object using it, starting at position __po
 
 <br>
 
-###### add_cube
+#### add_cube
 ```Fortran
 call add_cube(pos, s, index, edgeCol, edgeChar, fillCol, fillChar)
 ```
@@ -43,7 +43,7 @@ This creates a cube object with size __s__, starting at position __pos__ and sto
 
 <br>
 
-###### start, stop
+#### start, stop
 ```Fortran
 call start()
 call stop()
@@ -53,7 +53,7 @@ Start or stop ncurses.
 
 <br>
 
-###### str
+#### str
 ```Fortran
 call str(vector)
 call str(int)
@@ -64,7 +64,7 @@ Function to convert various data types to string, useful for UI.
 
 <br>
 
-###### draw_line_2d
+#### draw_line_2d
 ```Fortran
 call draw_line_2d(x1, y1, x2, y2, c)
 ```
@@ -77,7 +77,7 @@ Draw a 2D line from (__x1__, __y1__) to (__x2__, __y2__), with character __c__. 
 
 <br>
 
-###### draw_line_3d
+#### draw_line_3d
 ```Fortran
 call draw_line_3d(v1, v2, c, col, dz)
 ```
@@ -92,7 +92,7 @@ Draw a 2D line from __v1__ to __v2__ in 3D space, with character __c__. If c is 
 
 <br>
 
-###### draw_string_2d
+#### draw_string_2d
 ```Fortran
 call draw_string_2d(x, y, char)
 ```
@@ -105,7 +105,7 @@ Draw the string given by __char__ at the location (__x__, __y__) on the screen.
 
 <br>
 
-###### draw_string_3d
+#### draw_string_3d
 ```Fortran
 call draw_string_3d(v1, char, alwaysShow)
 ```
@@ -119,7 +119,7 @@ Draw the string given by __char__ at the location __v1__ in 3d space. The string
 
 <br>
 
-###### get_screen_size
+#### get_screen_size
 ```Fortran
 call get_screen_size(x, y)
 ```
@@ -131,7 +131,7 @@ Puts the size of the terminal into __x__ and __y__.
 
 <br>
 
-###### get_input
+#### get_input
 ```Fortran
 call get_input(k)
 ```
@@ -143,7 +143,7 @@ Puts the latest key pressed __k__ and processes certain key presses depending on
 
 <br>
 
-###### draw_box_2d
+#### draw_box_2d
 ```Fortran
 call draw_box_2d(x1, y1, x2, y2)
 ```
@@ -155,7 +155,7 @@ Draws a box to the screen from (__x1__, __y1__) to (__x2__, __y2__).
 
 <br>
 
-###### fill_box_2d
+#### fill_box_2d
 ```Fortran
 fill_box_2d(x1, y1, x2, y2, char)
 ```
@@ -168,7 +168,7 @@ Fills a box to the screen from (__x1__, __y1__) to (__x2__, __y2__) with __char_
 
 <br>
 
-###### render, draw
+#### render, draw
 ```Fortran
 render()
 draw()
@@ -178,7 +178,7 @@ render() the 3D scene, saving it to a buffer. Can then draw() the buffer to the 
 
 <br>
 
-###### set_orbit_distance
+#### set_orbit_distance
 ```Fortran
 set_orbit_distance(dist)
 ```
@@ -188,7 +188,7 @@ real, intent(in) :: dist
 
 Only used in orbit mode. Set the distance from the pivot that the camera should orbit.
 
-###### set_orbit_pivot
+#### set_orbit_pivot
 ```Fortran
 set_orbit_pivot(piv)
 ```
@@ -200,7 +200,7 @@ Only used in orbit mode. Set the location of the pivot that the camera should or
 
 <br>
 
-###### set_orbit_object
+#### set_orbit_object
 ```Fortran
 set_orbit_object(objIndex)
 ```
@@ -212,41 +212,58 @@ Only used in orbit mode. Set the object the camera should orbit around. Note tha
 
 <br>
 
-###### rotation getters and setters
+#### rotation getters and setters
 ```Fortran
-rotation = get_object_rot(index)
-call set_object_rot(index, newRot)
-call rotate_object(index, deltaRot)
+rotation = get_object_scale(index)
+call set_object_scale(index, newScale)
+call scale_object(index, deltaScale)
 ```
 ```Fortran
-real, dimension(3) :: get_object_rot
-real, dimension(3), intent(in) :: deltaRot
-real, dimension(3), intent(in) :: newRot
 integer, intent(in) :: index
+real, dimension(3) :: get_object_scale
+real, dimension(3), intent(in) :: newScale
+real, dimension(3), intent(in) :: deltaScale
 ```
 
 Get, set or change the rotation of an object.
 
 <br>
 
-###### position getters and setters
+#### position getters and setters
 ```Fortran
 position = get_object_pos(index)
 call set_object_pos(index, newPos)
 call translate_object(index, deltaPos)
 ```
 ```Fortran
+integer, intent(in) :: index
 real, dimension(3) :: get_object_pos
 real, dimension(3), intent(in) :: newPos
 real, dimension(3), intent(in) :: deltaPos
-integer, intent(in) :: index
 ```
 
 Get, set or change the position of an object.
 
 <br>
 
-###### camera getters and setters
+#### scale getters and setters
+```Fortran
+position = get_object_pos(index)
+call set_object_pos(index, newPos)
+call translate_object(index, deltaPos)
+```
+```Fortran
+integer, intent(in) :: index
+real, dimension(3) :: get_object_pos
+real, dimension(3), intent(in) :: newPos
+real, dimension(3), intent(in) :: deltaPos
+```
+
+Get, set or change the position of an object.
+
+<br>
+
+#### camera getters and setters
 ```Fortran
 position = get_camera_pos()
 call set_camera_pos(newPos)
@@ -264,7 +281,7 @@ Get, set or change the position or rotation of the camera.
 
 <br>
 
-###### set_debug
+#### set_debug
 ```Fortran
 set_debug(val)
 ```

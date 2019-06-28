@@ -27,7 +27,7 @@ module asciiGL
     type renderObject
         integer :: numTris = 0
         type(tri), allocatable, dimension(:) :: tris
-        real, dimension(3) :: centre = (/ 0, 0, 0 /), rot = (/ 0, 0, 0 /)
+        real, dimension(3) :: centre = (/ 0, 0, 0 /), rot = (/ 0, 0, 0 /), scale = (/ 1.0, 1.0, 1.0 /)
         character :: fillChar = ".", edgeChar = "/"
         integer :: fillCol = 0, edgeCol = 0
     end type
@@ -52,7 +52,9 @@ module asciiGL
     private :: objs, numObjs, transformations, screenWidth, screenHeight
     private :: halfW, halfH, lastChar, zBuffer, buffer
 
-    private :: fill_tri, charFromAngle, get_length_needed, calc_medians
+    private :: fill_tri, charFromAngle, get_length_needed, calc_medians, project_coords
+    private :: rotate_coords, transform_coords, process_input, update_orbit, get_color_number
+    private :: translate_object_dir, rotate_object_dir
 
 contains
 
@@ -191,6 +193,24 @@ contains
         real, dimension(3), intent(in) :: deltaRot
         integer, intent(in) :: index
         call rotate_object_dir(objs(index), deltaRot)
+    end subroutine
+
+    function get_object_scale(index)
+        real, dimension(3) :: get_object_scale
+        integer, intent(in) :: index
+        get_object_scale = objs(index)%scale
+    end function
+    subroutine set_object_scale(index, newScale)
+        real, dimension(3), intent(in) :: newScale
+        integer, intent(in) :: index
+        real, dimension(3) :: delta
+        delta = newScale / objs(index)%scale
+        call scale_object_dir(objs(index), delta)
+    end subroutine
+    subroutine scale_object(index, deltaScale)
+        real, dimension(3), intent(in) :: deltaScale
+        integer, intent(in) :: index
+        call scale_object_dir(objs(index), deltaScale)
     end subroutine
 
     subroutine set_orbit_object(objIndex)
@@ -1149,5 +1169,29 @@ contains
         obj%rot = obj%rot + v
 
     end subroutine
+
+    ! Scale an object by a vector TODO test
+    subroutine scale_object_dir(obj, v)
+
+        type(renderObject), intent(inout) :: obj
+        real, dimension(3), intent(in) :: v
+
+        integer :: i, j
+
+        do i=1, obj%numTris
+
+            do j=1, 3
+
+                ! Take away the objects central position, scale (about the origin) and then add it back
+                obj%tris(i)%verts(j,:) = v * (obj%tris(i)%verts(j,:) - obj%centre) + obj%centre
+
+            end do
+
+        end do
+
+        obj%scale = obj%scale * v
+
+    end subroutine
+
 
 end module
