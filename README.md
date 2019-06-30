@@ -2,6 +2,8 @@
 
 asciiGL is a lightweight Fortran library allowing the rendering of 3D objects in the terminal using only text.
 
+![asciiGL used to render a chair](https://github.com/lumorti/asciiGL/raw/master/chair.gif "asciiGL used to render a chair")
+
 ### Features
  - simple commands to create/transform objects
  - multiple camera control options such as linear WASD movement or an orbiting camera
@@ -47,15 +49,12 @@ program example
     call start()
 
     ! Set up the camera and allows the user to orbit using the arrows and zoom using w/s
-    call set_interactivity("orbit")
+    call set_interactivity("fly")
+    call set_camera_pos((/ 0.05, 4.85, 1.7 /))
+    call set_camera_rot((/ -0.30, 0.0, 0.05 /))
 
     ! Add a chair model, saving the ID into chairObject
-    call add_stl("chair.stl", (/ 0.0, 6.0, 0.0 /), chairObject, edgeCol="red")
-
-    ! Orbit around the chair, setting the initial distance and angle
-    call set_orbit_object(chairObject)
-    call set_orbit_distance(8.0)
-    call set_camera_rot((/ -0.48, 0.0, 0.0 /))
+    chairObject = add_stl("chair.stl", pos=(/ 0.0, 8.0, 0.7 /), scale=(/ 0.3, 0.3, 0.3 /), fillChar=" ")
 
     do
 
@@ -66,13 +65,12 @@ program example
         ! Get the user's key press (will also process inputs like wasd if enabled)
         call get_input(userInput)
 
-        ! Make the chair spin
-        call rotate_object(chairObject, (/ 0.0, 0.0, 0.005 /))
+        ! Rotate the chair
+        call rotate_object(chairObject, (/ 0.0, 0.0, 0.03 /))
 
     end do
 
 end program
-
 ```
 
 ### Documentation
