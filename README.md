@@ -33,7 +33,7 @@ in the directory and the run the resulting program with:
 ./a.out
 ```
 
-On windows you'll need to use "mingw32-make.exe" instead.
+On Windows you'll need to use "mingw32-make.exe" and "./a.exe" instead.
 
 ### Example Code (example.f90)
 
