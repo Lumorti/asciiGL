@@ -7,10 +7,10 @@ module asciiGL
     real, parameter :: pi = 3.1415926536
 
     ! System parameters
-    real :: moveSpeed = 0.02, rotSpeed = 0.02
+    real :: moveSpeed = 0.05, rotSpeed = 0.05
     real, parameter :: ez = 60
     real, parameter :: xScale = 2.0
-    real, parameter :: nearDistance = 0.5
+    real, parameter :: nearDistance = 0.1
     integer, parameter :: pointDensityScale = 2, pointDensityLimit = 120
     real, parameter :: lineOffset = 0.05
     integer, parameter :: maxObjects = 50
@@ -37,7 +37,7 @@ module asciiGL
     end interface
 
     ! Global vars
-    real, dimension(3) :: cameraPos, cameraDir, orbitPos = (/ 0.0, 0.0, 0.0 /)
+    real, dimension(3) :: cameraPos = (/ 0.0, 0.0, 1.7 /), cameraDir, orbitPos = (/ 0.0, 0.0, 0.0 /)
     logical :: wasdMoveEnabled = .false., arrowRotEnabled = .false., orbitEnabled = .false., flightEnabled = .false.
     logical :: debugEnabled = .false.
     type(renderObject), dimension(maxObjects) :: objs
@@ -317,7 +317,7 @@ contains
                     trisDrawn = trisDrawn + 1
 
                     ! Fill triangle using zBuffer
-                    call fill_tri(objs(i)%tris(j), objs(i)%fillChar, objs(i)%fillCol)
+                    if (len(objs(i)%fillChar)>0) call fill_tri(objs(i)%tris(j), objs(i)%fillChar, objs(i)%fillCol)
 
                     ! Add the edges using the zBuffer (a and b prevent array temporaries)
                     a = objs(i)%tris(j)%verts(1,:)
@@ -612,6 +612,7 @@ contains
         integer :: i
 
         do i = 1, len_trim(char)
+            if (x+i-1 > screenWidth) exit
             buffer(x+i-1, y) = char(i:i)
         end do
 
@@ -647,6 +648,7 @@ contains
             da = transformed1(2) - nearDistance
             db = transformed2(2) - nearDistance
             s = da / (da - db)
+            if (abs(s) > 1) return
 
             clipped1(1) = transformed1(1) + s*(transformed2(1)-transformed1(1))
             clipped1(2) = transformed1(2) + s*(transformed2(2)-transformed1(2))
@@ -657,6 +659,7 @@ contains
             da = transformed1(2) - nearDistance
             db = transformed2(2) - nearDistance
             s = da / (da - db)
+            if (abs(s) > 1) return
 
             clipped2(1) = transformed2(1) + s*(transformed2(1)-transformed1(1))
             clipped2(2) = transformed2(2) + s*(transformed2(2)-transformed1(2))
@@ -781,21 +784,33 @@ contains
 
             da = transformed1(2) - nearDistance
             db = transformed2(2) - nearDistance
-            s = da / (da - db)
+            s = -da / (da - db)
 
             clipped1(1) = transformed1(1) + s*(transformed2(1)-transformed1(1))
             clipped1(2) = transformed1(2) + s*(transformed2(2)-transformed1(2))
             clipped1(3) = transformed1(3) + s*(transformed2(3)-transformed1(3))
 
+            if (startCoords(1) >= 0 .and. startCoords(1)<=screenWidth .and. startCoords(2)>=0 .and. &
+            & startCoords(2) <= screenHeight)  call draw_string_2d(startCoords(1), startCoords(2), str(s))
+
+            if (endCoords(1)>=0 .and. endCoords(1)<=screenWidth .and. endCoords(2)>=0 .and.  &
+            & endCoords(2)<=screenHeight) call draw_string_2d(endCoords(1), endCoords(2), str(s))
+
         else if (transformed2(2) < nearDistance) then
 
             da = transformed1(2) - nearDistance
             db = transformed2(2) - nearDistance
-            s = da / (da - db)
+            s = -da / (da - db)
 
             clipped2(1) = transformed2(1) + s*(transformed2(1)-transformed1(1))
             clipped2(2) = transformed2(2) + s*(transformed2(2)-transformed1(2))
             clipped2(3) = transformed2(3) + s*(transformed2(3)-transformed1(3))
+
+            if (startCoords(1) >= 0 .and. startCoords(1)<=screenWidth .and. startCoords(2)>=0 .and. &
+            & startCoords(2) <= screenHeight)  call draw_string_2d(startCoords(1), startCoords(2), str(s))
+
+            if (endCoords(1)>=0 .and. endCoords(1)<=screenWidth .and. endCoords(2)>=0 .and.  &
+            & endCoords(2)<=screenHeight) call draw_string_2d(endCoords(1), endCoords(2), str(s))
 
         end if
 
@@ -819,6 +834,7 @@ contains
         deltaLength = length3d / pointDensity
         pos = clipped1
 
+
         do i = 0, pointDensity
 
             distance3d = sqrt((pos(1))**2 + (pos(2))**2 + (pos(3))**2) - zBufferMod
@@ -833,6 +849,7 @@ contains
                     zBuffer(coords(1), coords(2)) = distance3d
                     buffer(coords(1), coords(2)) = char
                     colBuffer(coords(1), coords(2)) = col
+
 
                 end if
 
@@ -972,26 +989,14 @@ contains
     end subroutine
 
     ! Create a cube at a certain position with a certain size
-    subroutine add_cube(pos, s, index, edgeCol, edgeChar, fillCol, fillChar)
+    function add_cube(pos, scale, rot, edgeCol, edgeChar, fillCol, fillChar)
 
-        real, dimension(3), intent(in) :: pos, s
-        integer, intent(inout), optional :: index
-        real :: w, d, h, x, y, z
+        real, dimension(3), intent(in), optional :: pos, scale, rot
+        integer :: add_cube
         character(*), intent(in), optional :: edgeChar, fillChar, fillCol, edgeCol
 
-        ! Shorthand
-        w = s(1) / 2.0
-        d = s(2) / 2.0
-        h = s(3) / 2.0
-        x = pos(1)
-        y = pos(2)
-        z = pos(3)
-
         numObjs = numObjs + 1
-
-        if (present(index)) then
-            index  = numObjs
-        end if
+        add_cube = numObjs
 
         if (present(edgeCol)) objs(numObjs)%edgeCol = get_color_number(edgeCol)
         if (present(edgeChar)) objs(numObjs)%edgeChar = edgeChar
@@ -1003,76 +1008,80 @@ contains
         allocate(objs(numObjs)%tris(objs(numObjs)%numTris))
 
         ! Closest face
-        objs(numObjs)%tris(1)%verts(1,:) = (/ x+w, y-d, z-h /)
-        objs(numObjs)%tris(1)%verts(2,:) = (/ x-w, y-d, z+h /)
-        objs(numObjs)%tris(1)%verts(3,:) = (/ x-w, y-d, z-h /)
-        objs(numObjs)%tris(2)%verts(1,:) = (/ x+w, y-d, z-h /)
-        objs(numObjs)%tris(2)%verts(2,:) = (/ x-w, y-d, z+h /)
-        objs(numObjs)%tris(2)%verts(3,:) = (/ x+w, y-d, z+h /)
+        objs(numObjs)%tris(1)%verts(1,:) = (/ 1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(1)%verts(2,:) = (/ -1.0, -1.0, 1.0 /)
+        objs(numObjs)%tris(1)%verts(3,:) = (/ -1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(2)%verts(1,:) = (/ 1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(2)%verts(2,:) = (/ -1.0, -1.0, 1.0 /)
+        objs(numObjs)%tris(2)%verts(3,:) = (/ 1.0, -1.0, 1.0 /)
         objs(numObjs)%tris(1)%norm(:) = (/ 0, -1, 0 /)
         objs(numObjs)%tris(2)%norm(:) = (/ 0, -1, 0 /)
 
         ! Furthest face
-        objs(numObjs)%tris(3)%verts(1,:) = (/ x+w, y+d, z-h /)
-        objs(numObjs)%tris(3)%verts(2,:) = (/ x-w, y+d, z+h /)
-        objs(numObjs)%tris(3)%verts(3,:) = (/ x-w, y+d, z-h /)
-        objs(numObjs)%tris(4)%verts(1,:) = (/ x+w, y+d, z-h /)
-        objs(numObjs)%tris(4)%verts(2,:) = (/ x-w, y+d, z+h /)
-        objs(numObjs)%tris(4)%verts(3,:) = (/ x+w, y+d, z+h /)
+        objs(numObjs)%tris(3)%verts(1,:) = (/ 1.0, 1.0, -1.0 /)
+        objs(numObjs)%tris(3)%verts(2,:) = (/ -1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(3)%verts(3,:) = (/ -1.0, 1.0, -1.0 /)
+        objs(numObjs)%tris(4)%verts(1,:) = (/ 1.0, 1.0, -1.0 /)
+        objs(numObjs)%tris(4)%verts(2,:) = (/ -1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(4)%verts(3,:) = (/ 1.0, 1.0, 1.0 /)
         objs(numObjs)%tris(3)%norm(:) = (/ 0, 1, 0 /)
         objs(numObjs)%tris(4)%norm(:) = (/ 0, 1, 0 /)
 
         ! Left face
-        objs(numObjs)%tris(5)%verts(1,:) = (/ x-w, y-d, z-h /)
-        objs(numObjs)%tris(5)%verts(2,:) = (/ x-w, y+d, z+h /)
-        objs(numObjs)%tris(5)%verts(3,:) = (/ x-w, y-d, z+h /)
-        objs(numObjs)%tris(6)%verts(1,:) = (/ x-w, y-d, z-h /)
-        objs(numObjs)%tris(6)%verts(2,:) = (/ x-w, y+d, z+h /)
-        objs(numObjs)%tris(6)%verts(3,:) = (/ x-w, y+d, z-h /)
+        objs(numObjs)%tris(5)%verts(1,:) = (/ -1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(5)%verts(2,:) = (/ -1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(5)%verts(3,:) = (/ -1.0, -1.0, 1.0 /)
+        objs(numObjs)%tris(6)%verts(1,:) = (/ -1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(6)%verts(2,:) = (/ -1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(6)%verts(3,:) = (/ -1.0, 1.0, -1.0 /)
         objs(numObjs)%tris(5)%norm(:) = (/ -1, 0, 0 /)
         objs(numObjs)%tris(6)%norm(:) = (/ -1, 0, 0 /)
 
         ! Right face
-        objs(numObjs)%tris(7)%verts(1,:) = (/ x+w, y-d, z-h /)
-        objs(numObjs)%tris(7)%verts(2,:) = (/ x+w, y+d, z+h /)
-        objs(numObjs)%tris(7)%verts(3,:) = (/ x+w, y-d, z+h /)
-        objs(numObjs)%tris(8)%verts(1,:) = (/ x+w, y-d, z-h /)
-        objs(numObjs)%tris(8)%verts(2,:) = (/ x+w, y+d, z+h /)
-        objs(numObjs)%tris(8)%verts(3,:) = (/ x+w, y+d, z-h /)
+        objs(numObjs)%tris(7)%verts(1,:) = (/ 1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(7)%verts(2,:) = (/ 1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(7)%verts(3,:) = (/ 1.0, -1.0, 1.0 /)
+        objs(numObjs)%tris(8)%verts(1,:) = (/ 1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(8)%verts(2,:) = (/ 1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(8)%verts(3,:) = (/ 1.0, 1.0, -1.0 /)
         objs(numObjs)%tris(7)%norm(:) = (/ 1, 0, 0 /)
         objs(numObjs)%tris(8)%norm(:) = (/ 1, 0, 0 /)
 
         ! Top face
-        objs(numObjs)%tris(9)%verts(1,:) = (/ x-w, y-d, z+h /)
-        objs(numObjs)%tris(9)%verts(2,:) = (/ x+w, y+d, z+h /)
-        objs(numObjs)%tris(9)%verts(3,:) = (/ x-w, y+d, z+h /)
-        objs(numObjs)%tris(10)%verts(1,:) = (/ x-w, y-d, z+h /)
-        objs(numObjs)%tris(10)%verts(2,:) = (/ x+w, y+d, z+h /)
-        objs(numObjs)%tris(10)%verts(3,:) = (/ x+w, y-d, z+h /)
+        objs(numObjs)%tris(9)%verts(1,:) = (/ -1.0, -1.0, 1.0 /)
+        objs(numObjs)%tris(9)%verts(2,:) = (/ 1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(9)%verts(3,:) = (/ -1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(10)%verts(1,:) = (/ -1.0, -1.0, 1.0 /)
+        objs(numObjs)%tris(10)%verts(2,:) = (/ 1.0, 1.0, 1.0 /)
+        objs(numObjs)%tris(10)%verts(3,:) = (/ 1.0, -1.0, 1.0 /)
         objs(numObjs)%tris(9)%norm(:) = (/ 0, 0, 1 /)
         objs(numObjs)%tris(10)%norm(:) = (/ 0, 0, 1 /)
 
         ! Bottom face
-        objs(numObjs)%tris(11)%verts(1,:) = (/ x-w, y-d, z-h /)
-        objs(numObjs)%tris(11)%verts(2,:) = (/ x+w, y+d, z-h /)
-        objs(numObjs)%tris(11)%verts(3,:) = (/ x-w, y+d, z-h /)
-        objs(numObjs)%tris(12)%verts(1,:) = (/ x-w, y-d, z-h /)
-        objs(numObjs)%tris(12)%verts(2,:) = (/ x+w, y+d, z-h /)
-        objs(numObjs)%tris(12)%verts(3,:) = (/ x+w, y-d, z-h /)
+        objs(numObjs)%tris(11)%verts(1,:) = (/ -1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(11)%verts(2,:) = (/ 1.0, 1.0, -1.0 /)
+        objs(numObjs)%tris(11)%verts(3,:) = (/ -1.0, 1.0, -1.0 /)
+        objs(numObjs)%tris(12)%verts(1,:) = (/ -1.0, -1.0, -1.0 /)
+        objs(numObjs)%tris(12)%verts(2,:) = (/ 1.0, 1.0, -1.0 /)
+        objs(numObjs)%tris(12)%verts(3,:) = (/ 1.0, -1.0, -1.0 /)
         objs(numObjs)%tris(11)%norm(:) = (/ 0, 0, -1 /)
         objs(numObjs)%tris(12)%norm(:) = (/ 0, 0, -1 /)
 
+        if (present(pos)) call translate_object_dir(objs(numObjs), pos)
+        if (present(rot)) call rotate_object_dir(objs(numObjs), rot)
+        if (present(scale)) call scale_object_dir(objs(numObjs), scale)
+
         call calc_medians(objs(numObjs))
 
-    end subroutine
+    end function
 
     ! Load a model from an STL file at a certain position
-    subroutine add_stl(filename, pos, index, edgeCol, edgeChar, fillCol, fillChar)
+    function add_stl(filename, pos, rot, scale, edgeCol, edgeChar, fillCol, fillChar)
 
-        real, dimension(3), intent(in) :: pos
+        real, dimension(3), intent(in), optional :: pos, rot, scale
         character(*), intent(in) :: filename
         character(*), intent(in), optional :: edgeChar, fillChar, fillCol, edgeCol
-        integer, intent(inout), optional :: index
+        integer :: add_stl
         integer*1, dimension(80) :: header
         integer*4 :: num
         integer*2 :: count
@@ -1080,10 +1089,7 @@ contains
         real*4, dimension(3) :: vector
 
         numObjs = numObjs + 1
-
-        if (present(index)) then
-            index  = numObjs
-        end if
+        add_stl = numObjs
 
         if (present(edgeCol)) objs(numObjs)%edgeCol = get_color_number(edgeCol)
         if (present(edgeChar)) objs(numObjs)%edgeChar = edgeChar
@@ -1120,10 +1126,13 @@ contains
 
         close(15)
 
-        call translate_object_dir(objs(numObjs), pos)
+        if (present(pos)) call translate_object_dir(objs(numObjs), pos)
+        if (present(rot)) call rotate_object_dir(objs(numObjs), rot)
+        if (present(scale)) call scale_object_dir(objs(numObjs), scale)
+
         call calc_medians(objs(numObjs))
 
-    end subroutine
+    end function
 
     ! Translate an object by a vector
     subroutine translate_object_dir(obj, v)

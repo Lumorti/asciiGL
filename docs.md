@@ -18,28 +18,28 @@ This sets the kind of control the user should have over the camera, here __type_
 
 #### add_stl
 ```Fortran
-call add_stl(filename, pos, index, edgeCol, edgeChar, fillCol, fillChar)
+objectIndex = add_stl(filename, pos, scale, rot, edgeCol, edgeChar, fillCol, fillChar)
 ```
 ```Fortran
-real, dimension(3), intent(in) :: pos
+integer :: add_stl
 character(*), intent(in) :: filename
+real, dimension(3), intent(in), optional :: pos, scale, rot
 character(*), intent(in), optional :: edgeChar, fillChar, fillCol, edgeCol
-integer, intent(inout), optional :: index
  ```
-This loads an stl file and creates an object using it, starting at position __pos__ and storing the ID of the newly generated object in __index__. The __edgeChar__ and __fillChar__ are the characters used to fill the respective sections, whilst __edgeCol__ and __fillCol__ are the colors ("white", "red", "green", "blue", "magenta", "yellow", "cyan") for those sections.
+This loads an stl file and creates an object using it, starting at position __pos__, rotation __rot__ and scale __scale__ and returning the ID of the newly generated object. The __edgeChar__ and __fillChar__ are the characters used to fill the respective sections, whilst __edgeCol__ and __fillCol__ are the colors ("white", "red", "green", "blue", "magenta", "yellow", "cyan") for those sections.
 
 <br>
 
 #### add_cube
 ```Fortran
-call add_cube(pos, s, index, edgeCol, edgeChar, fillCol, fillChar)
+objectIndex = add_cube(pos, scale, rot, edgeCol, edgeChar, fillCol, fillChar)
 ```
 ```Fortran
-real, dimension(3), intent(in) :: pos, s
-integer, intent(inout), optional :: index
+integer :: add_cube
+real, dimension(3), intent(in), optional :: pos, scale, rot
 character(*), intent(in), optional :: edgeChar, fillChar, fillCol, edgeCol
  ```
-This creates a cube object with size __s__, starting at position __pos__ and storing the ID of the newly generated object in __index__. The __edgeChar__ and __fillChar__ are the characters used to fill the respective sections, whilst __edgeCol__ and __fillCol__ are the colors ("white", "red", "green", "blue", "magenta", "yellow", "cyan") for those sections.
+This creates a cube object with size __s__, starting at position __pos__, rotation __rot__ and scale __scale__ and returning the ID of the newly generated object. The __edgeChar__ and __fillChar__ are the characters used to fill the respective sections, whilst __edgeCol__ and __fillCol__ are the colors ("white", "red", "green", "blue", "magenta", "yellow", "cyan") for those sections.
 
 <br>
 
