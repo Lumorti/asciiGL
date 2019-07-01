@@ -361,7 +361,7 @@ contains
         do i=1, screenWidth
             do j=1, screenHeight
                 e = attron(COLOR_PAIR(colBuffer(i, j)))                           ! Enable attribute.
-                e = mvaddch(j-1, i-1, ichar(buffer(i, j)))
+                e = mvaddch(j-1, i-1, int8(ichar(buffer(i, j))))
                 e = attroff(COLOR_PAIR(colBuffer(i, j)))                           ! Enable attribute.
             end do
         end do

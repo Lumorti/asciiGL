@@ -67,18 +67,18 @@ int macro_putwin(WINDOW *win, const char *filename){
    return(ierr);
 }
 /*----------------------------------------------------------------------------*/
-int macro_debug(WINDOW *win, const char *filename){
-   FILE *fp2;
-   int ierr;
-   fprintf(fp2,"got here A\n");
-   fp2=fopen("c.20","w");
-   fprintf(fp2,"filename=%s\n",filename);
-   fprintf(fp2,"win=%ld\n",win);
-   fprintf(fp2,"got here B\n");
-   fflush(fp2);
-   fclose(fp2);
-   return(ierr);
-}
+// int macro_debug(WINDOW *win, const char *filename){
+//    FILE *fp2;
+//    int ierr;
+//    fprintf(fp2,"got here A\n");
+//    fp2=fopen("c.20","w");
+//    fprintf(fp2,"filename=%s\n",filename);
+//    fprintf(fp2,"win=%ld\n",win);
+//    fprintf(fp2,"got here B\n");
+//    fflush(fp2);
+//    fclose(fp2);
+//    return(ierr);
+// }
 /*----------------------------------------------------------------------------*/
 /*><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><*/
 /*----------------------------------------------------------------------------*/

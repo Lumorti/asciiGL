@@ -14,7 +14,7 @@ program example
     call set_camera_rot((/ -0.30, 0.0, 0.05 /))
 
     ! Add a chair model, saving the ID into chairObject
-    chairObject = add_stl("chair.stl", pos=(/ 0.0, 8.0, 0.7 /), scale=(/ 0.3, 0.3, 0.3 /), fillChar=" ")
+    chairObject = add_stl("../models/chair.stl", pos=(/ 0.0, 8.0, 0.7 /), scale=(/ 0.3, 0.3, 0.3 /), fillChar=" ")
 
     do
 
@@ -26,7 +26,7 @@ program example
         call get_input(userInput)
 
         ! Rotate the chair
-        call rotate_object(chairObject, (/ 0.0, 0.0, 0.03 /))
+        call rotate_object(chairObject, (/ 0.0, 0.0, 0.01 /))
 
     end do
 
