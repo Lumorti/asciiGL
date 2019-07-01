@@ -24,7 +24,7 @@ To install on Windows using MinGW you need to install PDCurses, which can either
 
 ### Compiling
 
-A makefile is included along with an example, simply type:
+A makefile is included along with an example, simply enter the src directory and type:
 ```bash
 make
 ```
